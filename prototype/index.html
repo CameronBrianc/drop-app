@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Drop — Prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Source+Serif+4:opsz,wght@8..60,500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#F6F5F1;--surface:#FFFFFF;--ink:#181A1F;--ink-soft:#6B6E76;--line:#E7E5DF;--accent:#2F4BFF;--accent-ink:#EEF0FF;--live:#FF5A36;--live-soft:#FFEDE7;--good:#1B8F5A;--good-soft:#E6F5ED;--lock:#B9BCC4;}
+*{box-sizing:border-box;}
+html,body{height:100%;}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:'Inter',system-ui,sans-serif;display:flex;flex-direction:column;align-items:center;gap:10px;padding:28px 14px 40px;padding-top:calc(28px + env(safe-area-inset-top,0px));}
+h1.top{font-family:'Source Serif 4',serif;font-weight:500;font-size:22px;margin:0 0 4px;}
+p.sub{color:var(--ink-soft);font-size:14px;margin:0 0 6px;text-align:center;max-width:400px;}
+.controls{display:flex; gap:8px; margin-bottom:4px;}
+.ctrlbtn{border:1px solid var(--line);background:var(--surface);color:var(--ink);font-size:13px;font-weight:600;padding:8px 14px;border-radius:20px;cursor:pointer;font-family:inherit;}
+.ctrlbtn.play{background:var(--ink);color:#fff;border-color:var(--ink);}
+.ctrlbtn:disabled{opacity:.4;cursor:default;}
+#caption{min-height:18px;font-weight:600;font-size:13.5px;color:var(--accent);text-align:center;}
+
+.phone{width:375px;max-width:92vw;height:812px;max-height:80vh;background:var(--ink);border-radius:44px;border:10px solid var(--ink);overflow:hidden;position:relative;box-shadow:0 30px 60px -20px rgba(0,0,0,.35);}
+.layer{position:absolute;inset:0;background:var(--surface);overflow-y:auto;padding:20px 18px 30px;transition:transform .32s cubic-bezier(.32,.08,.24,1);-webkit-overflow-scrolling:touch;}
+.layer.push{transform:translateX(100%);pointer-events:none;}
+.layer.push.active{transform:translateX(0);pointer-events:auto;}
+.layer.modal{transform:translateY(100%);border-radius:26px 26px 0 0;box-shadow:0 -12px 30px rgba(0,0,0,.18);pointer-events:none;}
+.layer.modal.active{transform:translateY(0);pointer-events:auto;}
+.notch{position:sticky;top:-20px;margin:-20px -18px 14px;height:34px;background:inherit;z-index:2;}
+.backbar{display:flex;align-items:center;justify-content:space-between;margin:-6px 0 14px;}
+.backbar .left{display:flex;align-items:center;gap:10px;}
+.backbtn{width:32px;height:32px;border-radius:50%;border:1px solid var(--line);background:var(--surface);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:15px;}
+.backbar .t{font-weight:600;font-size:14px;}
+
+.label{font-size:11px;letter-spacing:.02em;color:var(--ink-soft);}
+.eyebrow{font-size:13px;color:var(--accent);font-weight:600;margin-bottom:2px;}
+h2.screen-h{font-family:'Source Serif 4',serif;font-size:24px;font-weight:500;margin:0 0 6px;}
+h3{font-size:15px;font-weight:600;margin:0 0 6px;}
+.btn{display:block;width:100%;text-align:center;padding:14px;border-radius:14px;background:var(--ink);color:#fff;font-weight:600;font-size:15px;border:none;cursor:pointer;font-family:inherit;}
+.btn.secondary{background:transparent;color:var(--ink);border:1px solid var(--line);}
+.btn.ghost{background:transparent;color:var(--ink-soft);font-weight:500;}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:14px;margin-bottom:10px;cursor:pointer;}
+.pill{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;padding:4px 9px;border-radius:20px;transition:background .3s,color .3s;}
+.pill.watch{background:var(--accent-ink);color:var(--accent);}
+.pill.alert{background:var(--live-soft);color:var(--live);}
+.pill.done{background:var(--good-soft);color:var(--good);}
+.dot{width:6px;height:6px;border-radius:50%;background:currentColor;}
+
+/* Onboarding: native scroll-snap, no custom drag JS */
+#onboarding{padding:0;}
+.ob-track{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;height:100%;scrollbar-width:none;}
+.ob-track::-webkit-scrollbar{display:none;}
+.ob-slide{flex:0 0 100%;scroll-snap-align:start;padding:26px 18px 30px;display:flex;flex-direction:column;}
+.ob-visual{height:190px;border-radius:18px;background:linear-gradient(160deg,var(--accent-ink),var(--surface));display:flex;align-items:center;justify-content:center;margin-bottom:22px;padding:14px;}
+.ob-visual .typed{background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px 14px;font-size:13px;box-shadow:0 10px 24px -12px rgba(0,0,0,.2);}
+.ob-visual .icon{font-size:48px;}
+.dots{display:flex;gap:6px;justify-content:center;margin-top:auto;}
+.dots span{width:6px;height:6px;border-radius:50%;background:var(--line);cursor:pointer;}
+.dots span.on{background:var(--ink);}
+.acct-row{display:flex;justify-content:space-between;align-items:center;border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin-bottom:10px;font-size:14px;}
+.acct-row .link{color:var(--accent);font-size:12.5px;font-weight:600;}
+
+.status-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;}
+.status-left{display:flex;align-items:center;gap:8px;}
+.livedot{width:7px;height:7px;border-radius:50%;background:var(--good);box-shadow:0 0 0 3px var(--good-soft);}
+.bell{width:34px;height:34px;border-radius:50%;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px;position:relative;}
+.bell .rd{position:absolute;top:5px;right:6px;width:7px;height:7px;border-radius:50%;background:var(--live);display:none;}
+.bell .rd.on{display:block;}
+.calendar-strip{display:flex;gap:8px;overflow-x:auto;margin-bottom:18px;padding-bottom:4px;cursor:pointer;}
+.cal-chip{flex:0 0 auto;width:62px;padding:9px 0;border-radius:12px;background:var(--surface);border:1px solid var(--line);text-align:center;}
+.cal-chip .d{font-size:17px;font-weight:700;}.cal-chip .m{font-size:10px;color:var(--ink-soft);}.cal-chip.hot{border-color:var(--live);}
+.watch-card{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;}
+.watch-card.pulse{animation:pulse 1.1s ease;}
+@keyframes pulse{0%{box-shadow:0 0 0 0 var(--accent-ink);}70%{box-shadow:0 0 0 8px transparent;}100%{box-shadow:0 0 0 0 transparent;}}
+.watch-card .meta{font-size:12px;color:var(--ink-soft);margin-top:3px;}
+.fab{position:absolute;right:18px;bottom:28px;width:54px;height:54px;border-radius:50%;background:var(--ink);color:#fff;font-size:26px;display:flex;align-items:center;justify-content:center;box-shadow:0 12px 24px -8px rgba(0,0,0,.4);border:none;cursor:pointer;z-index:3;}
+
+.chat-bubble{background:var(--accent-ink);color:var(--accent);border-radius:16px 16px 16px 4px;padding:12px 14px;font-size:14px;margin-bottom:14px;max-width:88%;opacity:0;transition:opacity .4s;}
+.chat-bubble.in{opacity:1;}
+.confirm-card{border:1.5px solid var(--ink);border-radius:16px;padding:16px;margin-bottom:16px;opacity:0;transform:translateY(6px);transition:opacity .4s,transform .4s;}
+.confirm-card.in{opacity:1;transform:translateY(0);}
+.confirm-row{display:flex;justify-content:space-between;font-size:13.5px;padding:7px 0;border-bottom:1px solid var(--line);}
+.confirm-row:last-child{border-bottom:none;}.confirm-row .k{color:var(--ink-soft);}
+
+.rule-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--line);font-size:14px;}
+.rule-row:last-child{border-bottom:none;}
+.toggle{width:38px;height:22px;border-radius:20px;background:var(--good);position:relative;flex:0 0 auto;}
+.toggle::after{content:'';position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;background:#fff;}
+.toggle.off{background:var(--line);}.toggle.off::after{right:auto;left:2px;}
+.toggle.locked{background:var(--lock);opacity:.6;}
+.locked-row{opacity:.55;}
+.lockchip{font-size:10px;background:var(--ink);color:#fff;padding:2px 7px;border-radius:10px;margin-left:6px;}
+
+.cal-track{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;}
+.cal-track::-webkit-scrollbar{display:none;}
+.cal-page{flex:0 0 100%;scroll-snap-align:start;}
+.cal-nav{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+.cal-nav button{background:none;border:1px solid var(--line);border-radius:50%;width:28px;height:28px;cursor:pointer;}
+
+.alert-screen{background:var(--ink);color:#fff;}
+.alert-img{height:140px;border-radius:14px;background:linear-gradient(160deg,#2A2D36,#14161B);margin-bottom:18px;display:flex;align-items:center;justify-content:center;font-size:34px;}
+.alert-screen .btn{background:var(--live);}
+.alert-screen .backbtn{background:#20232B;border-color:#2C2F38;color:#fff;}
+.alert-screen .backbar .t{color:#fff;}
+
+.tl-item{display:flex;gap:12px;}
+.tl-dotcol{display:flex;flex-direction:column;align-items:center;}
+.tl-dot{width:10px;height:10px;border-radius:50%;background:var(--line);margin-top:4px;transition:background .3s,box-shadow .3s;}
+.tl-dot.done{background:var(--good);}
+.tl-dot.now{background:var(--accent);box-shadow:0 0 0 4px var(--accent-ink);}
+.tl-line{width:2px;flex:1;background:var(--line);margin:2px 0;}
+.tl-body{padding-bottom:22px;}
+.tl-body .t{font-weight:600;font-size:14px;color:var(--ink-soft);transition:color .3s;}
+.tl-body .t.done{color:var(--ink);}
+.tl-body .s{font-size:12px;color:var(--ink-soft);margin-top:2px;}
+
+.tier{border:1px solid var(--line);border-radius:16px;padding:14px 16px;margin-bottom:10px;}
+.tier.current{border-color:var(--ink);}
+.tier .price{font-size:20px;font-weight:700;}
+.tier ul{margin:8px 0 0;padding-left:16px;font-size:12.5px;color:var(--ink-soft);}
+.tier li{margin-bottom:3px;}
+</style>
+</head>
+<body>
+
+<h1 class="top">Drop</h1>
+<p class="sub">Tell us what you want. We'll watch for it.</p>
+<div class="controls">
+  <button class="ctrlbtn play" id="playBtn" onclick="playFlow()">▶ Watch full flow: signup → purchase</button>
+  <button class="ctrlbtn" onclick="restart()">↺ Reset</button>
+</div>
+<p id="caption">Tap ▶ to watch the whole journey in real time, or explore screens yourself below.</p>
+
+<div class="phone">
+
+  <div class="layer" id="onboarding">
+    <div class="ob-track" id="obTrack">
+      <div class="ob-slide">
+        <div class="ob-visual"><div class="typed">"I want 2 Pokémon 30th Anniversary sets, any major retailer, under $100 each"</div></div>
+        <h2 class="screen-h">Say what you want.<br>We'll find it.</h2>
+        <p class="sub" style="text-align:left;">No Discord servers. No bot terminology. No refreshing ten tabs at once.</p>
+        <div class="dots"><span class="on" onclick="obGo(0)"></span><span onclick="obGo(1)"></span><span onclick="obGo(2)"></span></div>
+      </div>
+      <div class="ob-slide">
+        <div class="ob-visual"><span class="icon">💳</span></div>
+        <h2 class="screen-h">Ready to check out fast</h2>
+        <p class="sub" style="text-align:left;">Connect a payment method now, or add it later — you're always asked before anything is bought.</p>
+        <div class="acct-row"><span>Apple Pay</span><span class="link">Connect</span></div>
+        <div class="acct-row"><span>Card on file</span><span class="link">Add</span></div>
+        <div class="dots" style="margin-top:10px;"><span onclick="obGo(0)"></span><span class="on" onclick="obGo(1)"></span><span onclick="obGo(2)"></span></div>
+      </div>
+      <div class="ob-slide">
+        <div class="ob-visual"><span class="icon">🔔</span></div>
+        <h2 class="screen-h">What should we watch for?</h2>
+        <p class="sub" style="text-align:left;margin-bottom:22px;">Type your first request — plain English is all we need.</p>
+        <button class="btn" onclick="replaceRoot('home')">Get started</button>
+        <div class="dots"><span onclick="obGo(0)"></span><span onclick="obGo(1)"></span><span class="on" onclick="obGo(2)"></span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="layer" id="home" style="transform:translateX(100%);pointer-events:none;">
+    <div class="notch"></div>
+    <div class="status-row">
+      <div class="status-left"><span class="livedot"></span><span class="label">12 watches active</span></div>
+      <div class="bell" onclick="navigate('alert','push')">🔔<span class="rd" id="bellDot"></span></div>
+    </div>
+    <h3>Coming up</h3>
+    <div class="calendar-strip" onclick="navigate('calendar','push')">
+      <div class="cal-chip"><div class="d">22</div><div class="m">TUE</div></div>
+      <div class="cal-chip hot"><div class="d">24</div><div class="m">DROP</div></div>
+      <div class="cal-chip"><div class="d">26</div><div class="m">THU</div></div>
+      <div class="cal-chip"><div class="d">29</div><div class="m">SUN</div></div>
+    </div>
+    <h3>Your watches</h3>
+    <div class="card watch-card" onclick="navigate('rules','push')">
+      <div><strong>Pokémon 30th Anniv. Set</strong><div class="meta">Any major retailer · ≤$100 · qty 2</div></div>
+      <span class="pill watch"><span class="dot"></span>Watching</span>
+    </div>
+    <div class="card watch-card" id="radioCard" onclick="navigate('checkout','push')" style="display:none;">
+      <div><strong>Radiohead — Lower Bowl</strong><div class="meta">Primary sale only · ≤$250 · qty 2</div></div>
+      <span class="pill watch" id="radioPill"><span class="dot"></span>Watching</span>
+    </div>
+    <div class="card watch-card" style="cursor:default;">
+      <div><strong>Jordan 4 "Bred Reimagined"</strong><div class="meta">Nike, Foot Locker · ≤$220 · qty 1</div></div>
+      <span class="pill done"><span class="dot"></span>Purchased</span>
+    </div>
+    <button class="fab" onclick="navigate('request','push')">+</button>
+  </div>
+
+  <div class="layer push" id="request">
+    <div class="backbar"><div class="left"><button class="backbtn" onclick="back()">←</button><span class="t">New request</span></div></div>
+    <div class="chat-bubble" id="chatBubble">I want 2 concert tickets under $250 each, primary sale only, lower bowl, for the Radiohead show</div>
+    <div class="confirm-card" id="confirmCard">
+      <div class="eyebrow">Got it — confirm this watch</div>
+      <div class="confirm-row"><span class="k">Event</span><span>Radiohead, TBD venue</span></div>
+      <div class="confirm-row"><span class="k">Quantity</span><span>2 tickets</span></div>
+      <div class="confirm-row"><span class="k">Max price</span><span>$250 each</span></div>
+      <div class="confirm-row"><span class="k">Location</span><span>Lower bowl only</span></div>
+      <div class="confirm-row"><span class="k">Sale type</span><span>Primary only</span></div>
+      <div class="confirm-row"><span class="k">Resale</span><span>Off</span></div>
+    </div>
+    <button class="btn" style="margin-bottom:8px;" onclick="confirmWatch()">Confirm watch</button>
+    <button class="btn ghost" onclick="back()">Edit details</button>
+  </div>
+
+  <div class="layer push" id="rules">
+    <div class="backbar"><div class="left"><button class="backbtn" onclick="back()">←</button><span class="t">Purchase rules</span></div></div>
+    <p class="sub" style="text-align:left;margin-bottom:14px;">Pokémon 30th Anniversary Set</p>
+    <div class="card" style="cursor:default;">
+      <div class="rule-row"><span>Max price</span><span>$100 / item</span></div>
+      <div class="rule-row"><span>Quantity</span><span>2</span></div>
+      <div class="rule-row"><span>Preferred retailers</span><span>Any major</span></div>
+      <div class="rule-row"><span>Allow resale sites</span><div class="toggle off"></div></div>
+      <div class="rule-row locked-row"><span>Instant one-tap checkout <span class="lockchip">Assist</span></span><div class="toggle locked"></div></div>
+    </div>
+    <p class="meta" style="color:var(--ink-soft); font-size:12px; margin:-2px 0 12px;">You always confirm the purchase yourself — we get everything ready and waiting.</p>
+    <button class="btn secondary" onclick="navigate('upgrade','modal')">Upgrade to unlock instant checkout</button>
+  </div>
+
+  <div class="layer push" id="calendar">
+    <div class="backbar"><div class="left"><button class="backbtn" onclick="back()">←</button><span class="t">Drop calendar</span></div></div>
+    <div class="cal-nav"><button onclick="calGo(0)">‹</button><span class="label" id="calLabel">SEPTEMBER — swipe for October</span><button onclick="calGo(1)">›</button></div>
+    <div class="cal-track" id="calTrack" onscroll="calSync()">
+      <div class="cal-page">
+        <div class="card" style="cursor:default;"><div class="eyebrow">Sat, Sep 24</div><h3>Pokémon 30th Anniversary restock</h3><p class="meta" style="color:var(--ink-soft);font-size:12.5px;margin:2px 0 10px;">Expected 9:00am ET · Target, Walmart</p><span class="pill watch"><span class="dot"></span>Watch is set</span></div>
+        <div class="card" style="cursor:default;"><div class="eyebrow">Thu, Sep 26</div><h3>Radiohead — on-sale</h3><p class="meta" style="color:var(--ink-soft);font-size:12.5px;margin:2px 0 10px;">10:00am ET · Ticketmaster primary sale</p><span class="pill watch"><span class="dot"></span>Watch is set</span></div>
+      </div>
+      <div class="cal-page">
+        <div class="card" style="cursor:default;"><div class="eyebrow">Fri, Oct 03</div><h3>LEGO Botanicals collection</h3><p class="meta" style="color:var(--ink-soft);font-size:12.5px;margin:2px 0 10px;">Time TBD · LEGO.com</p><button class="btn ghost" style="padding:0;text-align:left;color:var(--accent);font-weight:600;">+ Set a watch</button></div>
+        <div class="card" style="cursor:default;"><div class="eyebrow">Sat, Oct 11</div><h3>Jordan 4 restock (rumored)</h3><p class="meta" style="color:var(--ink-soft);font-size:12.5px;margin:2px 0 10px;">Unconfirmed · Nike SNKRS</p><button class="btn ghost" style="padding:0;text-align:left;color:var(--accent);font-weight:600;">+ Set a watch</button></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="layer push alert-screen" id="alert">
+    <div class="backbar"><div class="left"><button class="backbtn" onclick="back()">←</button><span class="t">Live alert</span></div></div>
+    <div class="eyebrow" style="color:#FF9C82;">It's live</div>
+    <h2 class="screen-h" style="color:#fff;">Radiohead tickets found</h2>
+    <div class="alert-img">🎟️</div>
+    <div class="card" style="background:#20232B;border-color:#2C2F38;color:#fff;cursor:default;">
+      <div class="confirm-row" style="border-color:#333"><span class="k">Section</span><span>Lower Bowl, Row L</span></div>
+      <div class="confirm-row" style="border-color:#333"><span class="k">Price</span><span>$218 each</span></div>
+      <div class="confirm-row" style="border-color:#333"><span class="k">Quantity</span><span>2 available</span></div>
+    </div>
+    <button class="btn" onclick="navigate('checkout','push')">Buy now — 2 tickets, $436</button>
+    <button class="btn ghost" style="color:#9AA0AC;" onclick="back()">Not interested</button>
+  </div>
+
+  <div class="layer push" id="checkout">
+    <div class="backbar"><div class="left"><button class="backbtn" onclick="back()">←</button><span class="t">Checkout status</span></div></div>
+    <p class="sub" style="text-align:left;margin-bottom:18px;">Radiohead — Lower Bowl · 2 tickets</p>
+    <div class="tl-item"><div class="tl-dotcol"><div class="tl-dot" id="d1"></div><div class="tl-line"></div></div><div class="tl-body"><div class="t" id="t1">Found inventory</div><div class="s">Lower bowl, row L — matched your rules</div></div></div>
+    <div class="tl-item"><div class="tl-dotcol"><div class="tl-dot" id="d2"></div><div class="tl-line"></div></div><div class="tl-body"><div class="t" id="t2">Added to cart</div><div class="s">Held for 8 minutes by Ticketmaster</div></div></div>
+    <div class="tl-item"><div class="tl-dotcol"><div class="tl-dot" id="d3"></div><div class="tl-line"></div></div><div class="tl-body"><div class="t" id="t3">Confirming payment</div><div class="s">Waiting on your one-tap confirmation</div></div></div>
+    <div class="tl-item"><div class="tl-dotcol"><div class="tl-dot" id="d4"></div></div><div class="tl-body"><div class="t" id="t4">Purchased</div><div class="s">Outcome depends on inventory &amp; queue position</div></div></div>
+  </div>
+
+  <div class="layer modal" id="upgrade">
+    <div class="backbar"><span class="t" style="font-size:16px;">Do more with Drop</span><button class="backbtn" onclick="back()">✕</button></div>
+    <p class="sub" style="text-align:left;margin-bottom:16px;">Instant one-tap checkout is a Level 2 feature.</p>
+    <div class="tier current"><div class="label">CURRENT — WATCH</div><div class="price">$12.99<span style="font-size:12px;font-weight:400;">/mo</span></div><ul><li>Alerts &amp; calendar</li><li>Up to 5 watches</li><li>Manual checkout only</li></ul></div>
+    <div class="tier"><div class="label">ASSIST</div><div class="price">$39.99<span style="font-size:12px;font-weight:400;">/mo</span></div><ul><li>Cart pre-filled the moment it's found</li><li>25 watches, purchase rules</li><li>One tap to confirm — you click, always</li></ul><button class="btn" style="margin-top:12px;" onclick="back()">Upgrade</button></div>
+    <div class="tier"><div class="label">UNLIMITED</div><div class="price">$89.99<span style="font-size:12px;font-weight:400;">/mo</span></div><ul><li>Unlimited watches &amp; attempts</li><li>Multiple buyer profiles</li><li>Priority, fastest-in-line monitoring</li></ul><button class="btn secondary" style="margin-top:12px;" onclick="back()">Upgrade</button></div>
+  </div>
+
+</div>
+
+<script>
+let stack = ['onboarding']; let z = 1; let playing=false;
+const el = id => document.getElementById(id);
+const sleep = ms => new Promise(r=>setTimeout(r, ms));
+function caption(txt){ el('caption').textContent = txt; }
+
+function navigate(id, mode){ const e=el(id); z++; e.style.zIndex=z; e.classList.add(mode); requestAnimationFrame(()=>requestAnimationFrame(()=>e.classList.add('active'))); stack.push(id); }
+function back(){ if(stack.length<=1) return; const id=stack.pop(); el(id).classList.remove('active'); }
+function replaceRoot(id){ el('onboarding').style.transform='translateX(-100%)'; const e=el(id); e.style.transform=''; e.style.pointerEvents='auto'; e.style.zIndex=0; stack=[id]; }
+function restart(){
+  if(playing) return;
+  stack.forEach(id=>{ el(id).classList.remove('active','push','modal'); });
+  const ob = el('onboarding'); ob.style.transform=''; ob.style.zIndex=0;
+  const home = el('home'); home.style.transform='translateX(100%)'; home.style.pointerEvents='none';
+  el('obTrack').scrollTo({left:0,behavior:'auto'});
+  document.querySelectorAll('.ob-slide').forEach((s,i)=>{});
+  el('radioCard').style.display='none'; el('radioPill').className='pill watch'; el('radioPill').innerHTML='<span class="dot"></span>Watching';
+  el('bellDot').classList.remove('on');
+  el('chatBubble').classList.remove('in'); el('confirmCard').classList.remove('in');
+  ['d1','d2','d3','d4'].forEach(id=>el(id).classList.remove('done','now'));
+  el('t4').classList.remove('done');
+  stack=['onboarding'];
+  caption('Tap ▶ to watch the whole journey in real time, or explore screens yourself below.');
+}
+function confirmWatch(){ el('radioCard').style.display='flex'; const c=el('radioCard'); c.classList.add('pulse'); setTimeout(()=>c.classList.remove('pulse'),1100); back(); }
+function obGo(i){ el('obTrack').scrollTo({left:i*el('obTrack').clientWidth, behavior:'smooth'}); }
+function calGo(i){ el('calTrack').scrollTo({left:i*el('calTrack').clientWidth, behavior:'smooth'}); }
+function calSync(){ const t=el('calTrack'); const i=Math.round(t.scrollLeft/t.clientWidth); el('calLabel').textContent = i===0 ? 'SEPTEMBER — swipe for October' : 'OCTOBER — swipe back for September'; }
+
+async function playFlow(){
+  if(playing) return; playing=true; el('playBtn').disabled=true;
+  restart(); await sleep(500);
+  caption('Signing up…'); obGo(1); await sleep(1000);
+  caption('Adding a payment method…'); obGo(2); await sleep(1100);
+  caption('Ready — creating your first watch'); replaceRoot('home'); await sleep(900);
+  caption('Opening a new request…'); navigate('request','push'); await sleep(700);
+  caption('Understanding the request…'); el('chatBubble').classList.add('in'); await sleep(900);
+  el('confirmCard').classList.add('in'); caption('Confirming details before we watch'); await sleep(1100);
+  caption('Watch created'); confirmWatch(); await sleep(900);
+  caption('Watching for matching inventory…'); await sleep(1400);
+  caption('🔔 Alert — inventory found'); el('bellDot').classList.add('on');
+  el('radioPill').className='pill alert'; el('radioPill').innerHTML='<span class="dot"></span>Alert';
+  navigate('alert','push'); await sleep(1300);
+  caption('Buying…'); navigate('checkout','push'); await sleep(300);
+  el('d1').classList.add('done'); el('t1').classList.add('done'); await sleep(1100);
+  caption('Adding to cart…'); el('d2').classList.add('done'); el('t2').classList.add('done'); await sleep(1100);
+  caption('Confirming payment…'); el('d3').classList.add('now'); await sleep(1400);
+  caption('Purchase confirmed 🎉'); el('d3').classList.remove('now'); el('d3').classList.add('done'); el('t3').classList.add('done');
+  el('d4').classList.add('done'); el('t4').classList.add('done'); el('t4').textContent='Purchased';
+  el('radioPill').className='pill done'; el('radioPill').innerHTML='<span class="dot"></span>Purchased';
+  await sleep(1300);
+  back(); await sleep(350); back();
+  caption('All set — 2 tickets purchased for $436 total.');
+  playing=false; el('playBtn').disabled=false;
+}
+</script>
+</body>
+</html>
