@@ -119,13 +119,38 @@ h2.h{font-family:'Source Serif 4',serif;font-weight:500;font-size:24px;margin:0 
   <div class="tag">TELL US WHAT YOU WANT. WE'LL WATCH FOR IT.</div>
   <h1>Find and buy limited drops without the bots, Discords, or ten open tabs.</h1>
   <p class="lead">Create an account to start your first watch. Everything here runs live in your browser — your requests are actually parsed by AI, and your watchlist really persists.</p>
-  <div class="signup-card">
-    <label for="suName">Name</label>
+  <div class="signup-card" id="signupForm">
+    <label for="suName">Full name</label>
     <input type="text" id="suName" placeholder="Jordan Lee">
     <label for="suEmail">Email</label>
     <input type="email" id="suEmail" placeholder="you@email.com">
-    <button class="btn block" style="margin-top:18px;" onclick="signUp()">Create account</button>
-    <p style="font-size:11.5px;color:var(--ink-soft);margin-top:10px;">Stored only in this browser for this demo — no server account is created.</p>
+    <label for="suPhone">Phone</label>
+    <input type="text" id="suPhone" placeholder="(555) 123-4567">
+    <label for="suAddr">Shipping address</label>
+    <input type="text" id="suAddr" placeholder="123 Main St, Charleston, SC 29401">
+    <label for="suCard">Payment method — cardholder name</label>
+    <input type="text" id="suCard" placeholder="Same as above">
+    <div class="row">
+      <div style="flex:1;">
+        <label for="suLast4">Card last 4 digits</label>
+        <input type="text" id="suLast4" maxlength="4" placeholder="4242">
+      </div>
+      <div style="flex:1;">
+        <label for="suExp">Expiry</label>
+        <input type="text" id="suExp" placeholder="MM/YY">
+      </div>
+    </div>
+    <p style="font-size:11px;color:var(--ink-soft);margin:10px 0 0;">Demo only — no real card is stored, charged, or transmitted anywhere. Everything below stays in this browser.</p>
+    <button class="btn block" style="margin-top:16px;" onclick="startVerify()">Continue</button>
+  </div>
+
+  <div class="signup-card hidden" id="verifyForm">
+    <h3 style="margin:0 0 6px;font-size:16px;">Verify your email</h3>
+    <div id="verifyNotice" class="notice" style="margin-bottom:14px;">Sending your code…</div>
+    <label for="codeInput">Enter the 6-digit code</label>
+    <input type="text" id="codeInput" maxlength="6" placeholder="000000">
+    <button class="btn block" style="margin-top:16px;" onclick="verifyCode()">Verify &amp; create account</button>
+    <p id="verifyError" style="font-size:12.5px;color:#B23B1E;margin-top:8px;"></p>
   </div>
 </div>
 
@@ -172,6 +197,9 @@ h2.h{font-family:'Source Serif 4',serif;font-weight:500;font-size:24px;margin:0 
     <div class="card" style="max-width:420px;">
       <div class="meta">Name</div><h4 id="acctName" style="margin:0 0 12px;"></h4>
       <div class="meta">Email</div><h4 id="acctEmail" style="margin:0 0 12px;"></h4>
+      <div class="meta">Phone</div><h4 id="acctPhone" style="margin:0 0 12px;"></h4>
+      <div class="meta">Shipping address</div><h4 id="acctAddr" style="margin:0 0 12px;"></h4>
+      <div class="meta">Payment method</div><h4 id="acctPay" style="margin:0 0 12px;"></h4>
       <div class="meta">Plan</div><h4 style="margin:0 0 4px;">Watch — $12.99/mo</h4>
       <p style="font-size:12px;color:var(--ink-soft);">No real subscription is created here — billing isn't wired to a payment processor in this preview.</p>
     </div>
@@ -195,12 +223,67 @@ h2.h{font-family:'Source Serif 4',serif;font-weight:500;font-size:24px;margin:0 
 const LS_USER='drop_user', LS_WATCHES='drop_watches';
 let sampleFn=null;
 
-// ---------- auth (local only) ----------
+// ---------- auth ----------
 function loadUser(){ try{ return JSON.parse(localStorage.getItem(LS_USER)); }catch(e){ return null; } }
-function signUp(){
-  const name=document.getElementById('suName').value.trim()||'Friend';
-  const email=document.getElementById('suEmail').value.trim()||'you@example.com';
-  localStorage.setItem(LS_USER, JSON.stringify({name,email}));
+let pendingUser=null, pendingCode=null, pendingToken=null, usingRealEmail=false;
+
+async function startVerify(){
+  const name=document.getElementById('suName').value.trim();
+  const email=document.getElementById('suEmail').value.trim();
+  if(!name || !email){ alert('Name and email are required.'); return; }
+  pendingUser = {
+    name, email,
+    phone: document.getElementById('suPhone').value.trim(),
+    address: document.getElementById('suAddr').value.trim(),
+    cardName: document.getElementById('suCard').value.trim() || name,
+    last4: document.getElementById('suLast4').value.trim(),
+    exp: document.getElementById('suExp').value.trim()
+  };
+  document.getElementById('signupForm').classList.add('hidden');
+  document.getElementById('verifyForm').classList.remove('hidden');
+  const notice = document.getElementById('verifyNotice');
+  notice.className = 'notice'; notice.textContent = 'Sending your code…';
+
+  try{
+    const resp = await fetch('/api/send-code', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ email })
+    });
+    const data = await resp.json();
+    if(resp.ok && data.token){
+      pendingToken = data.token; usingRealEmail = true;
+      notice.className = 'notice';
+      notice.textContent = 'We just emailed a 6-digit code to ' + email + '. Enter it below.';
+      return;
+    }
+    throw new Error(data.error || 'send-code failed');
+  }catch(e){
+    // No backend deployed yet (or it's not configured) — fall back to local demo mode
+    usingRealEmail = false;
+    pendingCode = String(Math.floor(100000 + Math.random()*900000));
+    notice.className = 'notice warn';
+    notice.innerHTML = 'Email backend not detected — using demo mode. Your code: <strong style="letter-spacing:2px;">' + pendingCode + '</strong>';
+  }
+}
+
+async function verifyCode(){
+  const entered = document.getElementById('codeInput').value.trim();
+  const errEl = document.getElementById('verifyError');
+  errEl.textContent = '';
+
+  if(usingRealEmail){
+    try{
+      const resp = await fetch('/api/verify-code', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ token: pendingToken, code: entered, email: pendingUser.email })
+      });
+      const data = await resp.json();
+      if(!resp.ok || !data.verified){ errEl.textContent = data.error || 'Incorrect code.'; return; }
+    }catch(e){ errEl.textContent = 'Could not reach the server — try again.'; return; }
+  } else {
+    if(entered !== pendingCode){ errEl.textContent = 'That code doesn\'t match — check the demo code above and try again.'; return; }
+  }
+  localStorage.setItem(LS_USER, JSON.stringify(pendingUser));
   enterApp();
 }
 function signOut(){ localStorage.removeItem(LS_USER); location.reload(); }
@@ -213,7 +296,10 @@ function enterApp(){
   document.getElementById('userLabel').textContent = u.name;
   document.getElementById('welcomeH').textContent = 'Welcome back, ' + u.name.split(' ')[0];
   document.getElementById('acctName').textContent = u.name;
-  document.getElementById('acctEmail').textContent = u.email;
+  document.getElementById('acctEmail').textContent = u.email + ' (verified — demo)';
+  document.getElementById('acctPhone').textContent = u.phone || '—';
+  document.getElementById('acctAddr').textContent = u.address || '—';
+  document.getElementById('acctPay').textContent = u.last4 ? (u.cardName + ' · card ending ' + u.last4 + (u.exp ? ' · exp ' + u.exp : '')) : '—';
   renderWatches();
 }
 
