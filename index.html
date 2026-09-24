@@ -128,8 +128,30 @@ h2.h{font-family:'Source Serif 4',serif;font-weight:500;font-size:24px;margin:0 
     <input type="text" id="suPhone" placeholder="(555) 123-4567">
     <label for="suAddr">Shipping address</label>
     <input type="text" id="suAddr" placeholder="123 Main St, Charleston, SC 29401">
-    <label for="suCard">Payment method — cardholder name</label>
-    <input type="text" id="suCard" placeholder="Same as above">
+    <button class="btn block" style="margin-top:16px;" onclick="startVerify()">Continue</button>
+  </div>
+
+  <div class="signup-card hidden" id="verifyForm">
+    <h3 style="margin:0 0 6px;font-size:16px;">Verify your email</h3>
+    <div id="verifyNotice" class="notice" style="margin-bottom:14px;">Sending your code…</div>
+    <label for="codeInput">Enter the 6-digit code</label>
+    <input type="text" id="codeInput" maxlength="6" placeholder="000000">
+    <button class="btn block" style="margin-top:16px;" onclick="verifyCode()">Verify email</button>
+    <p id="verifyError" style="font-size:12.5px;color:#B23B1E;margin-top:8px;"></p>
+  </div>
+
+  <div class="hidden" id="planForm" style="max-width:640px;margin:0 auto;text-align:left;">
+    <h3 style="text-align:center;margin-bottom:16px;">Choose a plan to continue</h3>
+    <div class="tier"><div class="label">WATCH</div><div class="price">$12.99<span style="font-size:12px;font-weight:400;">/mo</span></div><ul><li>Alerts &amp; calendar</li><li>Up to 5 watches</li><li>Manual checkout only</li></ul><button class="btn block" style="margin-top:12px;" onclick="choosePlan('Watch','12.99')">Choose Watch</button></div>
+    <div class="tier"><div class="label">ASSIST</div><div class="price">$39.99<span style="font-size:12px;font-weight:400;">/mo</span></div><ul><li>Cart pre-filled the moment it's found</li><li>25 watches, purchase rules</li><li>One tap to confirm — you click, always</li></ul><button class="btn block" style="margin-top:12px;" onclick="choosePlan('Assist','39.99')">Choose Assist</button></div>
+    <div class="tier"><div class="label">UNLIMITED</div><div class="price">$89.99<span style="font-size:12px;font-weight:400;">/mo</span></div><ul><li>Unlimited watches &amp; attempts</li><li>Multiple buyer profiles</li><li>Priority, fastest-in-line monitoring</li></ul><button class="btn block secondary" style="margin-top:12px;" onclick="choosePlan('Unlimited','89.99')">Choose Unlimited</button></div>
+  </div>
+
+  <div class="signup-card hidden" id="paymentForm">
+    <h3 style="margin:0 0 4px;font-size:16px;">Add payment for <span id="payPlanName"></span></h3>
+    <p class="hint" style="margin-bottom:6px;" id="payPlanPrice"></p>
+    <label for="suCard">Cardholder name</label>
+    <input type="text" id="suCard" placeholder="Same as account name">
     <div class="row">
       <div style="flex:1;">
         <label for="suLast4">Card last 4 digits</label>
@@ -140,17 +162,9 @@ h2.h{font-family:'Source Serif 4',serif;font-weight:500;font-size:24px;margin:0 
         <input type="text" id="suExp" placeholder="MM/YY">
       </div>
     </div>
-    <p style="font-size:11px;color:var(--ink-soft);margin:10px 0 0;">Demo only — no real card is stored, charged, or transmitted anywhere. Everything below stays in this browser.</p>
-    <button class="btn block" style="margin-top:16px;" onclick="startVerify()">Continue</button>
-  </div>
-
-  <div class="signup-card hidden" id="verifyForm">
-    <h3 style="margin:0 0 6px;font-size:16px;">Verify your email</h3>
-    <div id="verifyNotice" class="notice" style="margin-bottom:14px;">Sending your code…</div>
-    <label for="codeInput">Enter the 6-digit code</label>
-    <input type="text" id="codeInput" maxlength="6" placeholder="000000">
-    <button class="btn block" style="margin-top:16px;" onclick="verifyCode()">Verify &amp; create account</button>
-    <p id="verifyError" style="font-size:12.5px;color:#B23B1E;margin-top:8px;"></p>
+    <p style="font-size:11px;color:var(--ink-soft);margin:10px 0 0;">Demo only — no real card is stored, charged, or transmitted anywhere.</p>
+    <button class="btn block" style="margin-top:16px;" onclick="finishSignup()">Start subscription</button>
+    <button class="btn ghost block" onclick="backToPlans()">← Choose a different plan</button>
   </div>
 </div>
 
@@ -169,7 +183,7 @@ h2.h{font-family:'Source Serif 4',serif;font-weight:500;font-size:24px;margin:0 
     <div class="addbox">
       <h3>New watch <span class="badge">LIVE AI PARSING</span></h3>
       <p class="hint">Describe what you want in plain English. This is sent to Claude in real time to extract the structured rule.</p>
-      <textarea id="reqInput" placeholder="e.g. I want 2 Pokémon 30th Anniversary sets from any major retailer for $100 or less each">I want 2 concert tickets under $250 each, primary sale only, lower bowl, for a Radiohead show</textarea>
+      <textarea id="reqInput" placeholder="e.g. I want 2 Pokémon 30th Anniversary sets from any major retailer for $100 or less each"></textarea>
       <div class="row">
         <button class="btn" id="parseBtn" onclick="parseRequest()">Parse with AI</button>
         <button class="btn secondary" onclick="document.getElementById('reqInput').value=''">Clear</button>
@@ -200,8 +214,9 @@ h2.h{font-family:'Source Serif 4',serif;font-weight:500;font-size:24px;margin:0 
       <div class="meta">Phone</div><h4 id="acctPhone" style="margin:0 0 12px;"></h4>
       <div class="meta">Shipping address</div><h4 id="acctAddr" style="margin:0 0 12px;"></h4>
       <div class="meta">Payment method</div><h4 id="acctPay" style="margin:0 0 12px;"></h4>
-      <div class="meta">Plan</div><h4 style="margin:0 0 4px;">Watch — $12.99/mo</h4>
-      <p style="font-size:12px;color:var(--ink-soft);">No real subscription is created here — billing isn't wired to a payment processor in this preview.</p>
+      <div class="meta">Plan</div><h4 id="acctPlan" style="margin:0 0 4px;"></h4>
+      <p style="font-size:12px;color:var(--ink-soft);margin:0 0 10px;">No real subscription is created here — billing isn't wired to a payment processor in this preview.</p>
+      <button class="btn small secondary" onclick="openPlanSwitcher()">Change plan</button>
     </div>
   </section>
 </main>
@@ -216,6 +231,16 @@ h2.h{font-family:'Source Serif 4',serif;font-weight:500;font-size:24px;margin:0 
     <div class="tl-item"><div class="tl-dotcol"><div class="tl-dot" id="cd3"></div><div class="tl-line"></div></div><div class="tl-body"><div class="t" id="ct3">Confirming payment</div><div class="s">Waiting on one-tap confirmation</div></div></div>
     <div class="tl-item"><div class="tl-dotcol"><div class="tl-dot" id="cd4"></div></div><div class="tl-body"><div class="t" id="ct4">Purchased (demo)</div><div class="s">Simulated outcome only</div></div></div>
     <button class="btn block" style="margin-top:14px;" onclick="closeCheckout()">Close</button>
+  </div>
+</div>
+
+<div class="overlay hidden" id="planOverlay">
+  <div class="modal" style="max-width:340px;">
+    <h3>Choose a plan</h3>
+    <div class="tier"><div class="label">WATCH</div><div class="price">$12.99<span style="font-size:12px;font-weight:400;">/mo</span></div><button class="btn block" style="margin-top:10px;" onclick="switchPlan('Watch','12.99')">Select</button></div>
+    <div class="tier"><div class="label">ASSIST</div><div class="price">$39.99<span style="font-size:12px;font-weight:400;">/mo</span></div><button class="btn block" style="margin-top:10px;" onclick="switchPlan('Assist','39.99')">Select</button></div>
+    <div class="tier"><div class="label">UNLIMITED</div><div class="price">$89.99<span style="font-size:12px;font-weight:400;">/mo</span></div><button class="btn block secondary" style="margin-top:10px;" onclick="switchPlan('Unlimited','89.99')">Select</button></div>
+    <button class="btn ghost block" onclick="document.getElementById('planOverlay').classList.add('hidden')">Cancel</button>
   </div>
 </div>
 
@@ -283,7 +308,34 @@ async function verifyCode(){
   } else {
     if(entered !== pendingCode){ errEl.textContent = 'That code doesn\'t match — check the demo code above and try again.'; return; }
   }
+  document.getElementById('verifyForm').classList.add('hidden');
+  document.getElementById('planForm').classList.remove('hidden');
+}
+function choosePlan(name, price){
+  pendingUser.tier = name; pendingUser.tierPrice = price;
+  document.getElementById('planForm').classList.add('hidden');
+  document.getElementById('paymentForm').classList.remove('hidden');
+  document.getElementById('payPlanName').textContent = name;
+  document.getElementById('payPlanPrice').textContent = '$' + price + '/mo';
+}
+function backToPlans(){
+  document.getElementById('paymentForm').classList.add('hidden');
+  document.getElementById('planForm').classList.remove('hidden');
+}
+function finishSignup(){
+  pendingUser.cardName = document.getElementById('suCard').value.trim() || pendingUser.name;
+  pendingUser.last4 = document.getElementById('suLast4').value.trim();
+  pendingUser.exp = document.getElementById('suExp').value.trim();
+  if(!pendingUser.last4 || pendingUser.last4.length<4){ alert('Card last 4 digits are required to start a subscription.'); return; }
   localStorage.setItem(LS_USER, JSON.stringify(pendingUser));
+  enterApp();
+}
+function openPlanSwitcher(){ document.getElementById('planOverlay').classList.remove('hidden'); }
+function switchPlan(name, price){
+  const u = loadUser(); if(!u) return;
+  u.tier = name; u.tierPrice = price;
+  localStorage.setItem(LS_USER, JSON.stringify(u));
+  document.getElementById('planOverlay').classList.add('hidden');
   enterApp();
 }
 function signOut(){ localStorage.removeItem(LS_USER); location.reload(); }
@@ -300,6 +352,7 @@ function enterApp(){
   document.getElementById('acctPhone').textContent = u.phone || '—';
   document.getElementById('acctAddr').textContent = u.address || '—';
   document.getElementById('acctPay').textContent = u.last4 ? (u.cardName + ' · card ending ' + u.last4 + (u.exp ? ' · exp ' + u.exp : '')) : '—';
+  document.getElementById('acctPlan').textContent = (u.tier || 'Watch') + ' — $' + (u.tierPrice || '12.99') + '/mo';
   renderWatches();
 }
 
