@@ -59,9 +59,10 @@ h2.h{font-family:'Source Serif 4',serif;font-weight:500;font-size:24px;margin:0 
 .addbox .row{display:flex;gap:10px;margin-top:10px;}
 .badge{font-size:10.5px;font-weight:700;letter-spacing:.03em;padding:3px 8px;border-radius:8px;background:var(--accent-ink);color:var(--accent);}
 .confirm{border:1px solid var(--line);border-radius:12px;padding:14px;margin-top:12px;background:var(--bg);}
-.confirm .r{display:flex;justify-content:space-between;font-size:13px;padding:5px 0;border-bottom:1px solid var(--line);}
+.confirm .r{display:flex;justify-content:space-between;align-items:center;font-size:13px;padding:5px 0;border-bottom:1px solid var(--line);gap:10px;}
 .confirm .r:last-child{border-bottom:none;}
-.confirm .r .k{color:var(--ink-soft);}
+.confirm .r .k{color:var(--ink-soft);flex:0 0 auto;}
+.confirm input,.confirm select{flex:1;max-width:220px;text-align:right;border:1px solid var(--line);border-radius:6px;padding:5px 8px;font-size:13px;font-family:inherit;background:var(--surface);}
 
 .grid{display:grid;gap:12px;grid-template-columns:1fr;}
 @media(min-width:640px){.grid{grid-template-columns:1fr 1fr;}}
@@ -198,11 +199,9 @@ h2.h{font-family:'Source Serif 4',serif;font-weight:500;font-size:24px;margin:0 
 
   <section class="section" id="tab-calendar">
     <h2 class="h">Drop calendar</h2>
-    <p class="subhead">Illustrative upcoming drops — preview data, not a live feed.</p>
-    <div class="notice">This calendar shows example data to illustrate the feature. A real version would connect to retailer/ticketing sources per the product's monitoring infrastructure.</div>
-    <div class="cal-item"><div class="d">SAT, SEP 26</div><h4 style="margin:4px 0;">Pokémon 30th Anniversary restock</h4><p class="meta" style="margin:0;">Expected 9:00am ET · Target, Walmart</p></div>
-    <div class="cal-item"><div class="d">THU, OCT 1</div><h4 style="margin:4px 0;">Radiohead — on-sale</h4><p class="meta" style="margin:0;">10:00am ET · Ticketmaster primary sale</p></div>
-    <div class="cal-item"><div class="d">FRI, OCT 9</div><h4 style="margin:4px 0;">LEGO Botanicals collection</h4><p class="meta" style="margin:0;">Time TBD · LEGO.com</p></div>
+    <p class="subhead">No live retailer/ticketing data feed is connected in this preview.</p>
+    <div class="notice">A real version would populate this from retailer and ticketing sources per the monitoring infrastructure in the product plan. For now, there's nothing to show here.</div>
+    <div class="empty">No calendar data source connected yet.</div>
   </section>
 
   <section class="section" id="tab-account">
@@ -393,15 +392,17 @@ function renderWatches(){
 }
 function removeWatch(id){ saveWatches(loadWatches().filter(w=>w.id!==id)); renderWatches(); }
 
-// ---------- AI parsing (real, via sample capability, with local fallback) ----------
+// ---------- AI parsing: real backend first, claude.ai preview capability second, local fallback last ----------
 async function ensureSample(){
   if(sampleFn) return sampleFn;
   try{ sampleFn = await claude.use('sample'); }catch(e){ sampleFn=null; }
   return sampleFn;
 }
 function fallbackParse(text){
-  const priceMatch = text.match(/\$?(\d+(\.\d+)?)/);
-  const qtyMatch = text.match(/\b(\d+)\s*(tickets|sets|items|x)?/i);
+  // Avoid grabbing ordinals ("30th", "3rd") or years as quantity/price.
+  const cleaned = text.replace(/\b(\d+)(st|nd|rd|th)\b/gi, '');
+  const priceMatch = cleaned.match(/\$\s?(\d+(\.\d+)?)/);
+  const qtyMatch = cleaned.match(/\b(\d{1,3})\s*(tickets?|sets?|items?|copies|units|pieces|x)\b/i);
   return {
     item: text.slice(0,60),
     retailer: /ticketmaster|primary sale/i.test(text) ? 'Primary sale only' : 'Any major retailer',
@@ -410,42 +411,74 @@ function fallbackParse(text){
     resale: /resale/i.test(text) ? 'On' : 'Off'
   };
 }
+let parseMode = 'none';
 async function parseRequest(){
   const text=document.getElementById('reqInput').value.trim();
   if(!text) return;
   const btn=document.getElementById('parseBtn'); btn.disabled=true; btn.textContent='Thinking…';
   const resultDiv=document.getElementById('parseResult');
   resultDiv.innerHTML='';
-  let parsed=null;
-  const s = await ensureSample();
-  if(s){
-    try{
-      parsed = await s.json(
-        `Extract a structured purchase-watch rule from this shopper request. ` +
-        `Respond with ONLY JSON: {"item": short product/event name, "retailer": string, "maxPrice": number as string, "qty": string, "resale": "On"|"Off"}. ` +
-        `Request: """${text}"""`
-      , { modelTier: 'quick' });
-    }catch(e){ parsed=null; }
+  let parsed=null; parseMode='none';
+
+  try{
+    const resp = await fetch('/api/parse-request', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ text })
+    });
+    if(resp.ok){ parsed = await resp.json(); parseMode='backend'; }
+  }catch(e){ /* fall through */ }
+
+  if(!parsed){
+    const s = await ensureSample();
+    if(s){
+      try{
+        parsed = await s.json(
+          `Extract a structured purchase-watch rule from this shopper request. ` +
+          `Respond with ONLY JSON: {"item": short product/event name, "retailer": string, "maxPrice": number as string (use "?" if not stated), "qty": number as string (default "1" — never use an unrelated number like an anniversary year as quantity), "resale": "On"|"Off"}. ` +
+          `Request: """${text}"""`
+        , { modelTier: 'quick' });
+        parseMode='preview';
+      }catch(e){ parsed=null; }
+    }
   }
-  if(!parsed) parsed = fallbackParse(text);
+
+  if(!parsed){ parsed = fallbackParse(text); parseMode='fallback'; }
   btn.disabled=false; btn.textContent='Parse with AI';
+
+  const modeNote = parseMode==='backend' ? 'Parsed by live Claude API call.'
+    : parseMode==='preview' ? 'Parsed by Claude (claude.ai preview).'
+    : 'AI backend not reachable — parsed with basic local matching. Review and correct below.';
+
   resultDiv.innerHTML = `
     <div class="confirm">
-      <div class="r"><span class="k">Item / Event</span><span>${parsed.item}</span></div>
-      <div class="r"><span class="k">Source</span><span>${parsed.retailer}</span></div>
-      <div class="r"><span class="k">Max price</span><span>$${parsed.maxPrice} each</span></div>
-      <div class="r"><span class="k">Quantity</span><span>${parsed.qty}</span></div>
-      <div class="r"><span class="k">Resale</span><span>${parsed.resale}</span></div>
+      <div class="r"><span class="k">Item / Event</span><input type="text" id="pf_item" value="${parsed.item.replace(/"/g,'&quot;')}"></div>
+      <div class="r"><span class="k">Source</span><input type="text" id="pf_retailer" value="${parsed.retailer.replace(/"/g,'&quot;')}"></div>
+      <div class="r"><span class="k">Max price ($)</span><input type="text" id="pf_price" value="${parsed.maxPrice}"></div>
+      <div class="r"><span class="k">Quantity</span><input type="text" id="pf_qty" value="${parsed.qty}"></div>
+      <div class="r"><span class="k">Resale</span>
+        <select id="pf_resale">
+          <option ${parsed.resale==='Off'?'selected':''}>Off</option>
+          <option ${parsed.resale==='On'?'selected':''}>On</option>
+        </select>
+      </div>
     </div>
+    <p style="font-size:11.5px;color:var(--ink-soft);margin:6px 0 0;">${modeNote} Fields are editable — fix anything before confirming.</p>
     <div class="row">
-      <button class="btn" onclick='confirmWatch(${JSON.stringify(JSON.stringify(parsed))})'>Confirm watch</button>
+      <button class="btn" onclick="confirmWatch()">Confirm watch</button>
       <button class="btn secondary" onclick="document.getElementById('parseResult').innerHTML=''">Discard</button>
     </div>`;
 }
-function confirmWatch(parsedJson){
-  const p = JSON.parse(parsedJson);
+function confirmWatch(){
   const list = loadWatches();
-  list.unshift({ id: 'w'+Date.now(), item:p.item, retailer:p.retailer, maxPrice:p.maxPrice, qty:p.qty, status:'watching' });
+  list.unshift({
+    id: 'w'+Date.now(),
+    item: document.getElementById('pf_item').value.trim(),
+    retailer: document.getElementById('pf_retailer').value.trim(),
+    maxPrice: document.getElementById('pf_price').value.trim(),
+    qty: document.getElementById('pf_qty').value.trim(),
+    resale: document.getElementById('pf_resale').value,
+    status:'watching'
+  });
   saveWatches(list);
   document.getElementById('parseResult').innerHTML='';
   document.getElementById('reqInput').value='';
