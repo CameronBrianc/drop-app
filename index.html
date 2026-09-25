@@ -192,8 +192,18 @@ h2.h{font-family:'Source Serif 4',serif;font-weight:500;font-size:24px;margin:0 
     </div>
 
     <div class="addbox">
+      <h3>Search real events <span class="badge">LIVE — TICKETMASTER</span></h3>
+      <p class="hint">Search an artist, team, or venue. Results are real events pulled live from Ticketmaster — including ones not on sale yet.</p>
+      <div class="row" style="margin-top:0;">
+        <input type="text" id="tmKeyword" placeholder="e.g. Mavericks, Radiohead, Lakers" style="flex:1;">
+        <button class="btn" id="tmSearchBtn" onclick="searchTickets()">Search</button>
+      </div>
+      <div id="tmResults"></div>
+    </div>
+
+    <div class="addbox">
       <h3>New watch <span class="badge">LIVE AI PARSING</span></h3>
-      <p class="hint">Describe what you want in plain English. This is sent to Claude in real time to extract the structured rule.</p>
+      <p class="hint">For anything else — collectibles, sneakers, general requests. Describe what you want in plain English.</p>
       <textarea id="reqInput" placeholder="e.g. I want 2 Pokémon 30th Anniversary sets from any major retailer for $100 or less each"></textarea>
       <div class="row">
         <button class="btn" id="parseBtn" onclick="parseRequest()">Parse with AI</button>
@@ -209,9 +219,9 @@ h2.h{font-family:'Source Serif 4',serif;font-weight:500;font-size:24px;margin:0 
 
   <section class="section" id="tab-calendar">
     <h2 class="h">Drop calendar</h2>
-    <p class="subhead">No live retailer/ticketing data feed is connected in this preview.</p>
-    <div class="notice">A real version would populate this from retailer and ticketing sources per the monitoring infrastructure in the product plan. For now, there's nothing to show here.</div>
-    <div class="empty">No calendar data source connected yet.</div>
+    <p class="subhead">Real dates for tracked Ticketmaster events. Nothing else is populated automatically.</p>
+    <div id="calList"></div>
+    <div class="empty hidden" id="calEmpty">Nothing tracked yet with a known date. Search and track an event on the Dashboard.</div>
   </section>
 
   <section class="section" id="tab-account">
@@ -402,21 +412,24 @@ function renderWatches(){
   document.getElementById('statAlerts').textContent = list.filter(w=>w.status==='alert').length;
   document.getElementById('statDone').textContent = list.filter(w=>w.status==='done').length;
   list.forEach(w=>{
-    const pillClass = w.status==='alert'?'alert':w.status==='done'?'done':'watch';
-    const pillText = w.status==='alert'?'Alert':w.status==='done'?'Purchased (demo)':'Watching';
+    const isTm = w.source==='ticketmaster';
+    const pillClass = isTm ? (w.onsaleStatus==='onsale' ? 'alert' : 'watch') : (w.status==='alert'?'alert':w.status==='done'?'done':'watch');
+    const pillText = isTm ? (w.onsaleStatus==='onsale' ? 'On sale now' : 'Not on sale yet') : (w.status==='alert'?'Alert':w.status==='done'?'Purchased (demo)':'Watching');
     const div=document.createElement('div');
     div.className='card';
+    const actions = isTm
+      ? `<a href="${w.tmUrl}" target="_blank" rel="noopener" class="btn small" style="text-decoration:none;">Open real event page ↗</a><button class="btn small secondary" onclick="removeWatch('${w.id}')">Remove</button>`
+      : `${w.status==='watching' ? `<button class="btn small" onclick="checkNow('${w.id}')">Check now (demo)</button>` : ''}
+         ${w.status==='alert' ? `<button class="btn small" onclick="buyNow('${w.id}')">Buy now (demo)</button>` : ''}
+         <button class="btn small secondary" onclick="removeWatch('${w.id}')">Remove</button>`;
     div.innerHTML = `
       <h4>${w.item}</h4>
       <div class="meta">${w.retailer} · ≤$${w.maxPrice} · qty ${w.qty}</div>
       <span class="pill ${pillClass}"><span class="dot"></span>${pillText}</span>
-      <div class="actions">
-        ${w.status==='watching' ? `<button class="btn small" onclick="checkNow('${w.id}')">Check now (demo)</button>` : ''}
-        ${w.status==='alert' ? `<button class="btn small" onclick="buyNow('${w.id}')">Buy now (demo)</button>` : ''}
-        <button class="btn small secondary" onclick="removeWatch('${w.id}')">Remove</button>
-      </div>`;
+      <div class="actions">${actions}</div>`;
     grid.appendChild(div);
   });
+  renderCalendar();
 }
 function removeWatch(id){ saveWatches(loadWatches().filter(w=>w.id!==id)); renderWatches(); }
 
@@ -548,6 +561,85 @@ async function runCheckoutSequence(){
   if(idx>-1){ list[idx].status='done'; saveWatches(list); }
 }
 function closeCheckout(){ document.getElementById('checkoutOverlay').classList.add('hidden'); renderWatches(); }
+
+// ---------- real Ticketmaster search ----------
+async function searchTickets(){
+  const keyword = document.getElementById('tmKeyword').value.trim();
+  const resultsDiv = document.getElementById('tmResults');
+  if(!keyword){ resultsDiv.innerHTML=''; return; }
+  const btn = document.getElementById('tmSearchBtn'); btn.disabled=true; btn.textContent='Searching…';
+  resultsDiv.innerHTML='';
+  try{
+    const resp = await fetch('/api/ticketmaster-search?keyword=' + encodeURIComponent(keyword));
+    const data = await resp.json();
+    btn.disabled=false; btn.textContent='Search';
+    if(!resp.ok){
+      resultsDiv.innerHTML = `<p class="notice warn">Live search isn't connected yet (${data.error||'backend not configured'}). This needs a TICKETMASTER_API_KEY set on the server — see README.</p>`;
+      return;
+    }
+    if(!data.events || !data.events.length){
+      resultsDiv.innerHTML = `<p class="empty">No matching events found. Try a broader search.</p>`;
+      return;
+    }
+    resultsDiv.innerHTML = data.events.map(ev => {
+      const onsale = ev.onsaleStatus === 'onsale';
+      const dateStr = ev.eventDate ? new Date(ev.eventDate + 'T00:00:00').toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'}) : 'Date TBD';
+      const priceStr = ev.priceMin ? `$${ev.priceMin}–$${ev.priceMax}` : 'Price TBD';
+      return `
+        <div class="cal-item">
+          <div class="d">${dateStr}${ev.eventTime ? ' · ' + ev.eventTime : ''}</div>
+          <h4 style="margin:4px 0;">${ev.name}</h4>
+          <p class="meta" style="margin:0 0 8px;">${ev.venue}${ev.city ? ', '+ev.city : ''} · ${priceStr} · ${onsale ? 'On sale now' : 'Not on sale yet'}</p>
+          <button class="btn small" onclick='trackEvent(${JSON.stringify(JSON.stringify(ev))})'>${onsale ? 'Track & watch for tickets' : 'Track — alert me when on sale'}</button>
+        </div>`;
+    }).join('');
+  }catch(e){
+    btn.disabled=false; btn.textContent='Search';
+    resultsDiv.innerHTML = `<p class="notice warn">Couldn't reach the search backend. This feature only works once deployed with a TICKETMASTER_API_KEY configured.</p>`;
+  }
+}
+function trackEvent(evJson){
+  const ev = JSON.parse(evJson);
+  const list = loadWatches();
+  list.unshift({
+    id: 'tm'+ev.id,
+    item: ev.name,
+    retailer: 'Ticketmaster (real event data)',
+    maxPrice: ev.priceMax || '?',
+    qty: '1',
+    resale: 'Off',
+    status: ev.onsaleStatus === 'onsale' ? 'watching' : 'watching',
+    eventDate: ev.eventDate,
+    venue: ev.venue,
+    city: ev.city,
+    onsaleStatus: ev.onsaleStatus,
+    tmUrl: ev.url,
+    source: 'ticketmaster'
+  });
+  saveWatches(list);
+  document.getElementById('tmResults').innerHTML = '<p class="empty">Added to your watches below.</p>';
+  document.getElementById('tmKeyword').value='';
+  renderWatches();
+  renderCalendar();
+}
+
+// ---------- calendar (real tracked events only) ----------
+function renderCalendar(){
+  const events = loadWatches().filter(w => w.source==='ticketmaster' && w.eventDate)
+    .sort((a,b)=> a.eventDate.localeCompare(b.eventDate));
+  const calList = document.getElementById('calList');
+  const calEmpty = document.getElementById('calEmpty');
+  if(!calList) return;
+  calEmpty.classList.toggle('hidden', events.length>0);
+  calList.innerHTML = events.map(ev=>{
+    const dateStr = new Date(ev.eventDate + 'T00:00:00').toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'});
+    return `<div class="cal-item">
+      <div class="d">${dateStr}</div>
+      <h4 style="margin:4px 0;">${ev.item}</h4>
+      <p class="meta" style="margin:0;">${ev.venue}${ev.city?', '+ev.city:''} · ${ev.onsaleStatus==='onsale' ? 'On sale' : 'Not on sale yet — will alert when it opens'}</p>
+    </div>`;
+  }).join('');
+}
 
 // ---------- init ----------
 (function(){
