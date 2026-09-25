@@ -130,6 +130,16 @@ h2.h{font-family:'Source Serif 4',serif;font-weight:500;font-size:24px;margin:0 
     <label for="suAddr">Shipping address</label>
     <input type="text" id="suAddr" placeholder="123 Main St, Charleston, SC 29401">
     <button class="btn block" style="margin-top:16px;" onclick="startVerify()">Continue</button>
+    <p style="font-size:12.5px;color:var(--ink-soft);text-align:center;margin-top:12px;">Already have an account? <a href="#" onclick="showSignIn();return false;" style="color:var(--accent);font-weight:600;">Sign in</a></p>
+  </div>
+
+  <div class="signup-card hidden" id="signinForm">
+    <h3 style="margin:0 0 12px;font-size:16px;">Sign in</h3>
+    <label for="siEmail">Email</label>
+    <input type="email" id="siEmail" placeholder="you@email.com">
+    <button class="btn block" style="margin-top:16px;" onclick="trySignIn()">Sign in</button>
+    <p id="signinError" style="font-size:12.5px;color:#B23B1E;margin-top:8px;"></p>
+    <p style="font-size:12.5px;color:var(--ink-soft);text-align:center;margin-top:12px;">New here? <a href="#" onclick="showSignUp();return false;" style="color:var(--accent);font-weight:600;">Create an account</a></p>
   </div>
 
   <div class="signup-card hidden" id="verifyForm">
@@ -337,7 +347,25 @@ function switchPlan(name, price){
   document.getElementById('planOverlay').classList.add('hidden');
   enterApp();
 }
-function signOut(){ localStorage.removeItem(LS_USER); location.reload(); }
+function signOut(){ localStorage.setItem('drop_signed_out','1'); location.reload(); }
+function showSignIn(){
+  document.getElementById('signupForm').classList.add('hidden');
+  document.getElementById('signinForm').classList.remove('hidden');
+  document.getElementById('signinError').textContent='';
+}
+function showSignUp(){
+  document.getElementById('signinForm').classList.add('hidden');
+  document.getElementById('signupForm').classList.remove('hidden');
+}
+function trySignIn(){
+  const email = document.getElementById('siEmail').value.trim().toLowerCase();
+  const u = loadUser();
+  const errEl = document.getElementById('signinError');
+  if(!u){ errEl.textContent = 'No account found on this device. Create one instead.'; return; }
+  if(!email || u.email.toLowerCase() !== email){ errEl.textContent = 'That email doesn\'t match the account on this device.'; return; }
+  localStorage.removeItem('drop_signed_out');
+  enterApp();
+}
 function enterApp(){
   const u=loadUser(); if(!u) return;
   document.getElementById('landing').classList.add('hidden');
@@ -522,7 +550,13 @@ async function runCheckoutSequence(){
 function closeCheckout(){ document.getElementById('checkoutOverlay').classList.add('hidden'); renderWatches(); }
 
 // ---------- init ----------
-(function(){ if(loadUser()) enterApp(); })();
+(function(){
+  const u = loadUser();
+  const signedOut = localStorage.getItem('drop_signed_out') === '1';
+  if(u && !signedOut){ enterApp(); }
+  else if(u && signedOut){ showSignIn(); }
+  // else: no account on this device — default signupForm is already showing
+})();
 </script>
 </body>
 </html>
